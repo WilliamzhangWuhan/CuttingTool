@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Runtime.InteropServices;
 
 namespace ScreenshotPin
@@ -12,5 +12,11 @@ namespace ScreenshotPin
 
         [DllImport("user32.dll", SetLastError = true)]
         public static extern bool RemoveClipboardFormatListener(IntPtr hwnd);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        public static extern bool IsClipboardFormatAvailable(uint format);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        public static extern uint RegisterClipboardFormat(string format);
     }
 }
