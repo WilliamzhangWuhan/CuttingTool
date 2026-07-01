@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Windows.Threading;
 using System.Windows.Interop;
 using System.Windows.Media.Imaging;
@@ -9,15 +9,17 @@ namespace ScreenshotPin
     {
         private readonly Dispatcher _dispatcher;
         private readonly DispatcherTimer _readTimer;
+        private readonly ScreenshotIntentTracker _screenshotIntentTracker;
         private HwndSource _source;
         private int _busyRetryCount;
         private bool _disposed;
 
         public event EventHandler<BitmapSource> ImageAvailable;
 
-        public ClipboardWatcher(Dispatcher dispatcher)
+        public ClipboardWatcher(Dispatcher dispatcher, ScreenshotIntentTracker screenshotIntentTracker)
         {
             _dispatcher = dispatcher ?? throw new ArgumentNullException("dispatcher");
+            _screenshotIntentTracker = screenshotIntentTracker ?? throw new ArgumentNullException("screenshotIntentTracker");
             _readTimer = new DispatcherTimer(DispatcherPriority.Background, _dispatcher);
             _readTimer.Interval = TimeSpan.FromMilliseconds(160);
             _readTimer.Tick += OnReadTimerTick;
@@ -29,6 +31,8 @@ namespace ScreenshotPin
             {
                 return;
             }
+
+            _screenshotIntentTracker.Start();
 
             var parameters = new HwndSourceParameters("ScreenshotPinClipboardWatcher");
             parameters.Width = 0;
@@ -71,7 +75,7 @@ namespace ScreenshotPin
 
         private void ScheduleClipboardRead()
         {
-            if (_disposed)
+            if (_disposed || !_screenshotIntentTracker.HasPendingScreenshotRequest())
             {
                 return;
             }
@@ -85,10 +89,16 @@ namespace ScreenshotPin
         {
             _readTimer.Stop();
 
+            if (!_screenshotIntentTracker.HasPendingScreenshotRequest())
+            {
+                return;
+            }
+
             BitmapSource image;
             ClipboardImageReadStatus status = ClipboardImageReader.TryReadImage(out image);
             if (status == ClipboardImageReadStatus.Success)
             {
+                _screenshotIntentTracker.ClearPendingScreenshotRequest();
                 EventHandler<BitmapSource> handler = ImageAvailable;
                 if (handler != null)
                 {
@@ -102,7 +112,10 @@ namespace ScreenshotPin
             {
                 _busyRetryCount++;
                 _readTimer.Start();
+                return;
             }
+
+            _screenshotIntentTracker.ClearPendingScreenshotRequest();
         }
     }
 }
